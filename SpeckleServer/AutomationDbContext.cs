@@ -7,7 +7,7 @@ public class AutomationDbContext : DbContext
 {
     public DbSet<Job> Jobs { get; set; }
     public DbSet<Stream> Streams { get; set; }
-    public DbSet<Command> NamedAutomations { get; set; }
+    public DbSet<Command> Commands { get; set; }
     public DbSet<Automation> Automations { get; set; }
 
     public AutomationDbContext(DbContextOptions options) : base(options)

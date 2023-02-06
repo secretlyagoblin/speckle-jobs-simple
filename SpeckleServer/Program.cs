@@ -10,7 +10,6 @@ builder.Services.AddControllers();
 
 builder.Services.AddSingleton<SpeckleListenerService>();
 builder.Services.AddScoped<RhinoJobService>();
-builder.Services.AddSingleton<RhinoComputeQueue>();
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
@@ -19,18 +18,26 @@ builder.Services.AddDbContext<AutomationDbContext>(options => options.UseInMemor
 
 var app = builder.Build();
 
+if (app.Environment.IsDevelopment())
+{
+    app.MapPost("/command/force", ([FromServices] AutomationDbContext db, [FromServices] RhinoJobService rhinoJobService) =>
+    {
+
+    });
+}
+
 app.MapPost("/start", ([FromServices] SpeckleListenerService speckle, [FromServices] RhinoJobService rhino ) =>
 {
-
+    throw new NotImplementedException(); //should start the speckle service if it hasn't started yet and to ensure consistent behaviour should trigger a tag
 });
 
 app.MapPost("/stop", ([FromServices] SpeckleListenerService service, [FromServices] RhinoJobService rhino) =>
 {
-    
+    throw new NotImplementedException(); //should disconnect the Speckle listener
 });
 
 app.MapGet("/commands", ([FromServices] AutomationDbContext db) => {
-    return db.NamedAutomations
+    return db.Commands
     .Include(x => x.AutomationHistory)
     .Select(x => new
     {
@@ -41,7 +48,7 @@ app.MapGet("/commands", ([FromServices] AutomationDbContext db) => {
 });
 
 app.MapGet("/commands/{command}", (string command, [FromServices] AutomationDbContext db) => {
-    return db.NamedAutomations
+    return db.Commands
     .Where(x => x.Name == command)
     .Include(x => x.AutomationHistory)
     .Select(x => new
@@ -64,9 +71,9 @@ app.MapPut("/commands/{command}", (string command, string ghString, [FromService
         GhString = ghString
     }).Entity;
 
-    var namedStep = db.NamedAutomations.Find(command) is Command n
-        ? db.NamedAutomations.Attach(n).Entity
-        : db.NamedAutomations.Add(new Command() { Name = command }).Entity;
+    var namedStep = db.Commands.Find(command) is Command n
+        ? db.Commands.Attach(n).Entity
+        : db.Commands.Add(new Command() { Name = command }).Entity;
 
     namedStep.AutomationHistory.Add(automation);
 
@@ -74,6 +81,17 @@ app.MapPut("/commands/{command}", (string command, string ghString, [FromService
 
     db.SaveChanges();
 
+});
+
+app.MapPost("/command/{command}/run", (string command, [FromServices] AutomationDbContext db, [FromServices] RhinoComputeQueue queue) =>
+{
+    db.Commands
+    .Where(x => x.Name == command)
+    .Include(x => x.AutomationHistory)
+    .Select(x => x.AutomationHistory.FirstOrDefault())
+    .Where(x => x is Automation)
+    .ToList()
+    .ForEach(x => queue.AddAutomation(x));
 });
 
 app.MapGet("/jobs", ([FromServices] AutomationDbContext db) => {
@@ -88,7 +106,7 @@ app.MapGet("/jobs", ([FromServices] AutomationDbContext db) => {
 
 app.MapPut("/jobs/{stream}/{command}", (string stream, string command, [FromServices] AutomationDbContext db, [FromServices] SpeckleListenerService sl) =>{
 
-    var commandRecord = db.NamedAutomations.Where(x => x.Name == command).Include(x => x.Jobs).SingleOrDefault();
+    var commandRecord = db.Commands.Where(x => x.Name == command).Include(x => x.Jobs).SingleOrDefault();
 
     if (commandRecord == null) throw new Exception($"Command {command} does not exist");
 
@@ -150,6 +168,10 @@ app.MapGet("/history", (int count, int offset, [FromServices] AutomationDbContex
         name = x.Command.Name
     });
 });
+
+
+
+
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

@@ -1,45 +1,54 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Speckle.Core.Api.SubscriptionModels;
 
 namespace SpeckleServer
 {
-    public class RhinoJobService : IHostedService
+    public class RhinoJobService : BackgroundService
     {
-        private readonly AutomationDbContext context;
-        private readonly RhinoComputeQueue queue;
+        private readonly CommitInfo _commitInfo;
+        private readonly AutomationDbContext _context;
+        private readonly IWebHostEnvironment _environment;
+        private readonly string _rhinoComputeUrl;
 
-        public RhinoJobService(AutomationDbContext context, RhinoComputeQueue queue)
+        public RhinoJobService(CommitInfo commitInfo, AutomationDbContext context, IConfiguration configuration, IWebHostEnvironment environment)
         {
-            this.context = context;
-            this.queue = queue;
+            this._commitInfo = commitInfo;
+            this._context = context;
+            this._environment = environment;
+            _rhinoComputeUrl = configuration.GetValue<string>("Rhino:ComputeUrl") ?? "";
         }
 
-        public void Calculate(Speckle.Core.Api.SubscriptionModels.CommitInfo e)
+        //public Task StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        //public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        private static async Task<GrasshopperScriptResult> TryRunGrasshopperScript(Automation automation)
         {
+            var delay = Random.Shared.Next(2000, 7000);
 
-            var jobs = context.Streams
-                .Where(x => x.StreamId == e.streamId)
+            await Task.Delay(delay);
+
+            return new GrasshopperScriptResult($"Task completed after {delay} millisecond delay.");
+        }
+
+        protected override Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            var tasks = _context.Streams
+                .Where(x => x.StreamId == _commitInfo.streamId)
                 .Include(x => x.Jobs)
                 .ThenInclude(x => x.Command)
                 .ThenInclude(x => x.AutomationHistory)
                 .SelectMany(x => x.Jobs)
                 .Select(x => x.Command.AutomationHistory.Last());
+            //.Async(TryRunGrasshopperScript,cancellationToken) ?? Task.CompletedTask;
 
-            foreach (var job in jobs)
-            {
-                queue.AddAutomation(job);
-            }
-        }
+            return Parallel.ForEachAsync(tasks, async (x, cancellationToken) => {
+                var result = await TryRunGrasshopperScript(x);
 
-        public Task StartAsync(CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
-            //throw new NotImplementedException();
-        }
+                Console.WriteLine(result);
 
-        public Task StopAsync(CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
-            //throw new NotImplementedException();
+                //do something
+            });
         }
     }
+
+    public record GrasshopperScriptResult(string Message);
 }
