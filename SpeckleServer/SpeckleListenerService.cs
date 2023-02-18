@@ -2,6 +2,8 @@
 using Speckle.Core.Api;
 using Speckle.Core.Credentials;
 using SpeckleServer;
+using SpeckleServer.Database;
+using SpeckleServer.RhinoJobber;
 using System.Collections;
 
 public class SpeckleListenerService 
@@ -44,7 +46,7 @@ public class SpeckleListenerService
         using var scope = _scopeFactory.CreateScope();
         var rj = scope.ServiceProvider.GetRequiredService<RhinoJobService>();
 
-        rj.Calculate(e);
+
     
     }
 

@@ -1,38 +1,28 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Speckle.Core.Api.SubscriptionModels;
+using SpeckleServer.Database;
 
-namespace SpeckleServer
+namespace SpeckleServer.RhinoJobber
 {
-    public class RhinoJobService : BackgroundService
+    internal class RhinoJobService
     {
-        private readonly CommitInfo _commitInfo;
-        private readonly AutomationDbContext _context;
-        private readonly IWebHostEnvironment _environment;
-        private readonly string _rhinoComputeUrl;
 
-        public RhinoJobService(CommitInfo commitInfo, AutomationDbContext context, IConfiguration configuration, IWebHostEnvironment environment)
+        private readonly AutomationDbContext _context;
+        private readonly IServiceScopeFactory _scopeFactory;
+        private readonly string _rhinoComputeUrl;
+        private Task _baseTask = Task.CompletedTask;
+
+        public RhinoJobService(AutomationDbContext context, IConfiguration configuration, IServiceScopeFactory scopeFactory)
         {
-            this._commitInfo = commitInfo;
             this._context = context;
-            this._environment = environment;
+            this._scopeFactory = scopeFactory;
             _rhinoComputeUrl = configuration.GetValue<string>("Rhino:ComputeUrl") ?? "";
         }
 
-        //public Task StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-        //public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-        private static async Task<GrasshopperScriptResult> TryRunGrasshopperScript(Automation automation)
-        {
-            var delay = Random.Shared.Next(2000, 7000);
-
-            await Task.Delay(delay);
-
-            return new GrasshopperScriptResult($"Task completed after {delay} millisecond delay.");
-        }
-
-        protected override Task ExecuteAsync(CancellationToken stoppingToken)
+        public void RunCommandFromCommit(CommitInfo commit)
         {
             var tasks = _context.Streams
-                .Where(x => x.StreamId == _commitInfo.streamId)
+                .Where(x => x.StreamId == commit.streamId)
                 .Include(x => x.Jobs)
                 .ThenInclude(x => x.Command)
                 .ThenInclude(x => x.AutomationHistory)
@@ -40,15 +30,34 @@ namespace SpeckleServer
                 .Select(x => x.Command.AutomationHistory.Last());
             //.Async(TryRunGrasshopperScript,cancellationToken) ?? Task.CompletedTask;
 
-            return Parallel.ForEachAsync(tasks, async (x, cancellationToken) => {
-                var result = await TryRunGrasshopperScript(x);
+        }
 
-                Console.WriteLine(result);
+        public void RunCommandFromStream(string streamId)
+        {
+            var tasks = _context.Streams                
+                .Include(x => x.Jobs)
+                .ThenInclude(x => x.Command)
+                .ThenInclude(x => x.AutomationHistory)
+                .Where(x => x.StreamId == streamId)
+                .ToList()
+                .SelectMany(x => x.Jobs)
+                .Select(x => x.Command.AutomationHistory.Last());
+            //.Async(TryRunGrasshopperScript,cancellationToken) ?? Task.CompletedTask;
 
-                //do something
-            });
+        }
+
+        public void RunCommandByName(string command)
+        {
+            var tasks = _context.Commands
+                .Where(x => x.Name == command)
+                .Include(x => x.AutomationHistory)
+                .Select(x => x.AutomationHistory.Last());
+
+            var computer = _scopeFactory.CreateScope().ServiceProvider.GetService(typeof(RhinoComputeService)) as RhinoComputeService;
+
+            computer?.StartBeDoingIt();
+
         }
     }
 
-    public record GrasshopperScriptResult(string Message);
 }

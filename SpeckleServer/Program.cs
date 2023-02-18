@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SpeckleServer;
+using SpeckleServer.Database;
+using SpeckleServer.RhinoJobber;
 using System.Linq;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,6 +11,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 
 builder.Services.AddSingleton<SpeckleListenerService>();
+builder.Services.AddSingleton<RhinoComputeService>();
 builder.Services.AddScoped<RhinoJobService>();
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -17,14 +20,6 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddDbContext<AutomationDbContext>(options => options.UseInMemoryDatabase("items"));
 
 var app = builder.Build();
-
-if (app.Environment.IsDevelopment())
-{
-    app.MapPost("/command/force", ([FromServices] AutomationDbContext db, [FromServices] RhinoJobService rhinoJobService) =>
-    {
-
-    });
-}
 
 app.MapPost("/start", ([FromServices] SpeckleListenerService speckle, [FromServices] RhinoJobService rhino ) =>
 {
@@ -64,16 +59,16 @@ app.MapGet("/commands/{command}", (string command, [FromServices] AutomationDbCo
     .ToList();
 });
 
-app.MapPut("/commands/{command}", (string command, string ghString, [FromServices] AutomationDbContext db) =>{
+app.MapPut("/commands/{command}", (string command, Command commandPayload, [FromServices] AutomationDbContext db) =>{
 
     var automation = db.Automations.Add(new Automation()
     {
-        GhString = ghString
+        GhString = commandPayload.GhString
     }).Entity;
 
-    var namedStep = db.Commands.Find(command) is Command n
+    var namedStep = db.Commands.Find(command) is SpeckleServer.Database.Command n
         ? db.Commands.Attach(n).Entity
-        : db.Commands.Add(new Command() { Name = command }).Entity;
+        : db.Commands.Add(new SpeckleServer.Database.Command() { Name = command }).Entity;
 
     namedStep.AutomationHistory.Add(automation);
 
@@ -83,15 +78,9 @@ app.MapPut("/commands/{command}", (string command, string ghString, [FromService
 
 });
 
-app.MapPost("/command/{command}/run", (string command, [FromServices] AutomationDbContext db, [FromServices] RhinoComputeQueue queue) =>
+app.MapPost("/command/{command}/run", (string command, [FromServices] RhinoJobService rh) =>
 {
-    db.Commands
-    .Where(x => x.Name == command)
-    .Include(x => x.AutomationHistory)
-    .Select(x => x.AutomationHistory.FirstOrDefault())
-    .Where(x => x is Automation)
-    .ToList()
-    .ForEach(x => queue.AddAutomation(x));
+    rh.RunCommandByName(command);
 });
 
 app.MapGet("/jobs", ([FromServices] AutomationDbContext db) => {
@@ -116,9 +105,9 @@ app.MapPut("/jobs/{stream}/{command}", (string stream, string command, [FromServ
         return;
     }
 
-    var streamRecord = db.Streams.Find(stream) is Stream str
+    var streamRecord = db.Streams.Find(stream) is SpeckleServer.Database.Stream str
         ? db.Streams.Attach(str).Entity
-        : db.Streams.Add(new Stream() { StreamId = stream }).Entity;
+        : db.Streams.Add(new SpeckleServer.Database.Stream() { StreamId = stream }).Entity;
 
     var job = db.Jobs.Add(new Job()
     {
@@ -169,7 +158,13 @@ app.MapGet("/history", (int count, int offset, [FromServices] AutomationDbContex
     });
 });
 
-
+app.MapGet("/results", ([FromServices] RhinoComputeService rc) =>
+{
+    return rc.computeJobs.Select(x =>
+    new {
+        job = x
+    });
+});
 
 
 
@@ -187,3 +182,7 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+public partial class Program{ } // to expose tests
+
+public record Command(string GhString);
