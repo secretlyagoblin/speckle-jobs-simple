@@ -9,14 +9,12 @@ namespace SpeckleServer.RhinoJobber
 
         private readonly AutomationDbContext _context;
         private readonly IServiceScopeFactory _scopeFactory;
-        private readonly string _rhinoComputeUrl;
-        private Task _baseTask = Task.CompletedTask;
+
 
         public RhinoJobService(AutomationDbContext context, IConfiguration configuration, IServiceScopeFactory scopeFactory)
         {
-            this._context = context;
-            this._scopeFactory = scopeFactory;
-            _rhinoComputeUrl = configuration.GetValue<string>("Rhino:ComputeUrl") ?? "";
+            _context = context;
+            _scopeFactory = scopeFactory;
         }
 
         public void RunCommandFromCommit(CommitInfo commit)
@@ -46,7 +44,7 @@ namespace SpeckleServer.RhinoJobber
 
         }
 
-        public void RunCommandByName(string command)
+        public void RunCommandByName(string command, CommandRunSettings runSettings)
         {
             var tasks = _context.Commands
                 .Where(x => x.Name == command)
@@ -55,8 +53,15 @@ namespace SpeckleServer.RhinoJobber
 
             var computer = _scopeFactory.CreateScope().ServiceProvider.GetService(typeof(RhinoComputeService)) as RhinoComputeService;
 
-            computer?.StartBeDoingIt();
+            if(computer is null)
+            {
+                throw new Exception("Rhino Compute Service could not be started");
+            }
 
+            foreach (var task in tasks)
+            {
+                computer.StartJob(runSettings.commitUrl, task.GhString);
+            }
         }
     }
 

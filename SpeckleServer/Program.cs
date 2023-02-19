@@ -61,26 +61,46 @@ app.MapGet("/commands/{command}", (string command, [FromServices] AutomationDbCo
 
 app.MapPut("/commands/{command}", (string command, Command commandPayload, [FromServices] AutomationDbContext db) =>{
 
-    var automation = db.Automations.Add(new Automation()
+    if (string.IsNullOrEmpty(command))
     {
-        GhString = commandPayload.GhString
-    }).Entity;
+        return Results.BadRequest("Invalid command");
+    }
 
-    var namedStep = db.Commands.Find(command) is SpeckleServer.Database.Command n
-        ? db.Commands.Attach(n).Entity
-        : db.Commands.Add(new SpeckleServer.Database.Command() { Name = command }).Entity;
+    if (commandPayload?.GhString is null)
+    {
+        return Results.BadRequest("Invalid command payload");
+    }
 
-    namedStep.AutomationHistory.Add(automation);
+    try
+    {
 
-    //var changes = db.ChangeTracker.ToDebugString();
+        var automation = db.Automations.Add(new Automation()
+        {
+            GhString = commandPayload.GhString
+        }).Entity;
 
-    db.SaveChanges();
+        var namedStep = db.Commands.Find(command) is SpeckleServer.Database.Command n
+            ? db.Commands.Attach(n).Entity
+            : db.Commands.Add(new SpeckleServer.Database.Command() { Name = command }).Entity;
+
+        namedStep.AutomationHistory.Add(automation);
+
+        //var changes = db.ChangeTracker.ToDebugString();
+
+        db.SaveChanges();
+
+    } catch(Exception ex)
+    {
+        return Results.BadRequest($"Failed to load request: {ex.Message}");
+    }
+
+    return Results.Ok();
 
 });
 
-app.MapPost("/command/{command}/run", (string command, [FromServices] RhinoJobService rh) =>
+app.MapPost("/command/{command}/run", (string command, CommandRunSettings runSettings, [FromServices] RhinoJobService rh) =>
 {
-    rh.RunCommandByName(command);
+    rh.RunCommandByName(command, runSettings );
 });
 
 app.MapGet("/jobs", ([FromServices] AutomationDbContext db) => {
@@ -93,7 +113,9 @@ app.MapGet("/jobs", ([FromServices] AutomationDbContext db) => {
     .ToList();;
 });
 
-app.MapPut("/jobs/{stream}/{command}", (string stream, string command, [FromServices] AutomationDbContext db, [FromServices] SpeckleListenerService sl) =>{
+app.MapPut("/jobs/{stream}/{command}", (string stream, string command, [FromServices] AutomationDbContext db, [FromServices] SpeckleListenerService sl) => {
+
+
 
     var commandRecord = db.Commands.Where(x => x.Name == command).Include(x => x.Jobs).SingleOrDefault();
 
@@ -109,7 +131,7 @@ app.MapPut("/jobs/{stream}/{command}", (string stream, string command, [FromServ
         ? db.Streams.Attach(str).Entity
         : db.Streams.Add(new SpeckleServer.Database.Stream() { StreamId = stream }).Entity;
 
-    var job = db.Jobs.Add(new Job()
+    var job = db.Jobs.Add(new SpeckleServer.Database.Job()
     {
         Command = commandRecord,
         Stream = streamRecord
@@ -186,3 +208,4 @@ app.Run();
 public partial class Program{ } // to expose tests
 
 public record Command(string GhString);
+public record CommandRunSettings(string commitUrl);
