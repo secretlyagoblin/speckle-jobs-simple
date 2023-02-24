@@ -80,11 +80,11 @@ namespace SpeckleServer.Tests
 
             var commandRunSettings = new CommandRunSettings("https://speckle.xyz/streams/511eeb2612/globals");
 
-            var resA = await client.PostAsJsonAsync($"{command}/run", commandRunSettings);
-            var resB = await client.PostAsJsonAsync($"{command}/run", commandRunSettings);
-            var resC = await client.PostAsJsonAsync($"{command}/run", commandRunSettings);
-            var resD = await client.PostAsJsonAsync($"{command}/run", commandRunSettings);
-            var resE = await client.PostAsJsonAsync($"{command}/run", commandRunSettings);
+            var resA = await client.PostAsJsonAsync($"/command/{command}/run", commandRunSettings);
+            var resB = await client.PostAsJsonAsync($"/command/{command}/run", commandRunSettings);
+            var resC = await client.PostAsJsonAsync($"/command/{command}/run", commandRunSettings);
+            var resD = await client.PostAsJsonAsync($"/command/{command}/run", commandRunSettings);
+            var resE = await client.PostAsJsonAsync($"/command/{command}/run", commandRunSettings);
 
             var getResponse = await client.GetAsync("results").Result.Content.ReadFromJsonAsync<JsonElement>();
 
