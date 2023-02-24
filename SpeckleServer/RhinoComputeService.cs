@@ -10,6 +10,7 @@ using System.Collections.Concurrent;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 using System.Diagnostics.Metrics;
 using System.Text.Json;
+using System;
 
 public class RhinoComputeService 
 {
@@ -38,11 +39,19 @@ public class RhinoComputeService
         };
     }
 
-    public void StartJob(string stream, string algo)
+    public JobTicket StartJob(string stream, string algo)
     {
+        var guid = new Guid();
+        var key = Convert.ToBase64String(guid.ToByteArray())
+            .Substring(0, 22)
+            .Replace("/", "_");
+
+        var ticket = new JobTicket(key);
+
+
         jobDoers.Enqueue(new Job(stream,_token,algo));
 
-        if (jobQueueIsCurrentlyIterating) return;
+        if (jobQueueIsCurrentlyIterating) return ticket;
 
         jobQueueIsCurrentlyIterating = true;
 
@@ -57,6 +66,8 @@ public class RhinoComputeService
             }
             jobQueueIsCurrentlyIterating = false;
         });
+
+        return ticket;
     }
 
     private void RunJobOnCompute(Job job)
@@ -121,3 +132,5 @@ public class RhinoComputeService
 }
 
 public record Job(string Stream, string Token, string Algo);
+
+public record JobTicket(string Key);

@@ -100,7 +100,7 @@ app.MapPut("/commands/{command}", (string command, Command commandPayload, [From
 
 app.MapPost("/command/{command}/run", (string command, CommandRunSettings runSettings, [FromServices] RhinoJobService rh) =>
 {
-    rh.RunCommandByName(command, runSettings );
+    return rh.RunCommandByName(command, runSettings );
 });
 
 app.MapGet("/jobs", ([FromServices] AutomationDbContext db) => {

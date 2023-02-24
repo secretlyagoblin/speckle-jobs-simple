@@ -44,12 +44,12 @@ namespace SpeckleServer.RhinoJobber
 
         }
 
-        public void RunCommandByName(string command, CommandRunSettings runSettings)
+        public JobTicket RunCommandByName(string command, CommandRunSettings runSettings)
         {
-            var tasks = _context.Commands
+            var task = _context.Commands
                 .Where(x => x.Name == command)
                 .Include(x => x.AutomationHistory)
-                .Select(x => x.AutomationHistory.Last());
+                .Select(x => x.AutomationHistory.Last()).Single();
 
             var computer = _scopeFactory.CreateScope().ServiceProvider.GetService(typeof(RhinoComputeService)) as RhinoComputeService;
 
@@ -58,10 +58,9 @@ namespace SpeckleServer.RhinoJobber
                 throw new Exception("Rhino Compute Service could not be started");
             }
 
-            foreach (var task in tasks)
-            {
-                computer.StartJob(runSettings.commitUrl, task.GhString);
-            }
+
+             
+            return computer.StartJob(runSettings.commitUrl, task.GhString);
         }
     }
 
