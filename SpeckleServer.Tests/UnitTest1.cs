@@ -21,7 +21,7 @@ namespace SpeckleServer.Tests
         }
 
         [Test]
-        public async Task TestRootEndpoint()
+        public async Task AddCommandSucceeds()
         {
             await using var application = new WebApplicationFactory<Program>();
             using var client = application.CreateClient();
@@ -33,7 +33,7 @@ namespace SpeckleServer.Tests
         }
 
         [Test]
-        public async Task TestRootEndpointNull()
+        public async Task AddNullCommandFails()
         {
             await using var application = new WebApplicationFactory<Program>();
             using var client = application.CreateClient();
@@ -41,25 +41,6 @@ namespace SpeckleServer.Tests
             var response = await client.PutAsJsonAsync("/commands/myCommand", new Command(null));
 
             Assert.That(response?.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.BadRequest));
-        }
-
-        [Test]
-        public async Task CommandAddedToStream()
-        {
-            await using var application = new WebApplicationFactory<Program>();
-            using var client = application.CreateClient();
-
-            var commandName = "doBattleWithZeFoole";
-            var speckleStream = "111xxx111";
-
-            var command = $"/commands/{commandName}";
-
-            var commandResponse = await client.PutAsJsonAsync(command, new Command("xxx111"));
-            var jobResponse = await client.PutAsync($"jobs/{speckleStream}/{commandName}",null);
-            var getResponse = await client.GetAsync("jobs").Result.Content.ReadFromJsonAsync<JsonElement>();
-
-            Assert.That(getResponse[0].GetProperty("command").GetString(), Is.EqualTo(commandName));
-            Assert.That(getResponse[0].GetProperty("stream").GetString(), Is.EqualTo(speckleStream));
         }
 
         [Test]
@@ -91,7 +72,7 @@ namespace SpeckleServer.Tests
             Assert.That(getResponse.ValueKind, Is.EqualTo(JsonValueKind.Array));
             Assert.That(getResponse.GetArrayLength, Is.EqualTo(0));
 
-            Task.Delay(TimeSpan.FromSeconds(90)).Wait();
+            Task.Delay(TimeSpan.FromSeconds(45)).Wait();
 
             getResponse = await client.GetAsync("results").Result.Content.ReadFromJsonAsync<JsonElement>();
 

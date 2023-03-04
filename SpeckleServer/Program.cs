@@ -5,6 +5,7 @@ using SpeckleServer;
 using SpeckleServer.Database;
 using SpeckleServer.RhinoJobber;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -108,38 +109,58 @@ app.MapGet("/jobs", ([FromServices] AutomationDbContext db) => {
     .Select(x => new
     {
         stream = x.StreamId,
-        command = x.CommandId
+        command = x.CommandId,
+        hint = x.DestinationUrlHint,
     })
     .ToList();;
 });
 
-app.MapPut("/jobs/{stream}/{command}", (string stream, string command, [FromServices] AutomationDbContext db, [FromServices] SpeckleListenerService sl) => {
+app.MapPut("/jobs/new", (NewJobScema jobSchema, [FromServices] AutomationDbContext db, [FromServices] SpeckleListenerService sl) => {
 
+    var command = jobSchema.command;
 
+    var urls = new[] { jobSchema.targetPath, jobSchema.destinationPath }.Select(x => sl.ValidateWildcardSpeckleStream(x));
+
+    foreach (var result in urls)
+    {
+        if (!result.isValid) return Results.BadRequest("Invalid Speckle stream");
+
+        var stream = result.stream;
+        var key = result.key;
+
+        if (stream.Contains('*') || string.IsNullOrWhiteSpace(stream)) return Results.BadRequest("A stream cannot be empty or a wildcard value");
+
+        if (key is not "branches") return Results.BadRequest("We can only create requests for branches at the moment");
+    }
+
+    var target = urls.First();
 
     var commandRecord = db.Commands.Where(x => x.Name == command).Include(x => x.Jobs).SingleOrDefault();
 
-    if (commandRecord == null) throw new Exception($"Command {command} does not exist");
+    if (commandRecord == null) return Results.BadRequest($"Command {command} does not exist");
 
-    if (commandRecord.Jobs.Where(x=>x.StreamId == stream).SingleOrDefault() is not null)
+    if (commandRecord.Jobs.Where(x=>x.StreamId == target.stream).SingleOrDefault() is not null)
     {
-        //return Results.Ok;
-        return;
+        return Results.Ok();        
     }
 
-    var streamRecord = db.Streams.Find(stream) is SpeckleServer.Database.Stream str
+    var streamRecord = db.Streams.Find(target.stream) is SpeckleServer.Database.Stream str
         ? db.Streams.Attach(str).Entity
-        : db.Streams.Add(new SpeckleServer.Database.Stream() { StreamId = stream }).Entity;
+        : db.Streams.Add(new SpeckleServer.Database.Stream() { StreamId = target.stream }).Entity;
 
     var job = db.Jobs.Add(new SpeckleServer.Database.Job()
     {
         Command = commandRecord,
-        Stream = streamRecord
+        Stream = streamRecord,
+        TriggeringUrl = jobSchema.targetPath,
+        DestinationUrlHint = jobSchema.destinationPath
     });
 
     db.SaveChanges();
 
     sl.UpdateStreams();
+
+    return Results.Ok();
 });
 
 app.MapGet("/streams", ([FromServices] AutomationDbContext db) => {
@@ -207,5 +228,6 @@ app.Run();
 
 public partial class Program{ } // to expose tests
 
+public record NewJobScema(string targetPath, string destinationPath, string command);
 public record Command(string GhString);
 public record CommandRunSettings(string commitUrl);

@@ -24,6 +24,16 @@ namespace SpeckleServer.Database
 
         public string StreamId { get; set; }
         public Stream Stream { get; set; }
+
+        /// <summary>
+        /// This can contain * wildcards which are the regex eqivalent to \w+
+        /// </summary>
+        public string TriggeringUrl { get; set; }
+
+        /// <summary>
+        /// This can contain wildcards as well, and variables can be index matched to the inputs - we should also be checking to see if they're identical to prvent recusive loops
+        /// </summary>
+        public string DestinationUrlHint { get; set; }
         public string CommandId { get; set; }
         public Command Command { get; set; }
 
