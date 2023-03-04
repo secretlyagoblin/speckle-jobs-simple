@@ -72,6 +72,12 @@ public class RhinoComputeService
 
     private void RunJobOnCompute(Job job)
     {
+        if (!_client.GetAsync("/_debug").Wait(1))
+        {
+            computeJobs.Enqueue("Rhino.Compute server is not running");
+            return;
+        }
+
         const string? POINTER = null;
 
         var schema = new
@@ -119,6 +125,8 @@ public class RhinoComputeService
 
         try
         {
+
+
             var script = _client.PostAsJsonAsync("/grasshopper", schema).Result.Content.ReadFromJsonAsync<JsonElement>().Result;
             computeJobs.Enqueue(script.GetRawText());
 

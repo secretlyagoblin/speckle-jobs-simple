@@ -32,6 +32,8 @@ namespace SpeckleServer
                 return;
             }
 
+            IsValid = true;
+
             //still sorry, I was still trying to be clever
             Preamble = match.Groups.GetValueOrDefault(nameof(Preamble))?.Value ?? "";
             ServerUrl = match.Groups.GetValueOrDefault(nameof(ServerUrl))?.Value ?? "";

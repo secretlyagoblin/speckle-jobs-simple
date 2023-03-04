@@ -11,6 +11,9 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using System.Net.Http.Json;
 using System.Net;
 using System.Text.Json;
+using Speckle.Core.Transports;
+using static System.Runtime.InteropServices.JavaScript.JSType;
+using Speckle.Core.Models;
 
 namespace SpeckleServer.Tests
 {
@@ -31,7 +34,7 @@ namespace SpeckleServer.Tests
         {
             using var client = CreateClient();
 
-            _streams.ForEach(x => client.StreamDelete(x));
+            _streams.ForEach(x => client.StreamDelete(x).Wait());
             _streams.Clear();
         }
 
@@ -79,21 +82,30 @@ namespace SpeckleServer.Tests
             var destinationPath = $"{speckleClient.ServerUrl}/streams/{stream}/branches/notMain";
 
 
-            var jobResponse = await client.PutAsJsonAsync($"jobs/new", new NewJobScema(targetPath, destinationPath, commandName));
+            var jobResponse = await client.PutAsJsonAsync($"/jobs/new", new NewJobScema(targetPath, destinationPath, commandName));
+
+            Assert.That(jobResponse.IsSuccessStatusCode);
 
             Task.Delay(TimeSpan.FromSeconds(5)).Wait();
 
-            speckleClient.tra
+            var transport = new ServerTransport(speckleClient.Account, stream);
+
+            var dummyData = new Base();
+            dummyData["dummyInt"] = 42;
+            dummyData["dummyChild"] = new Base();
+            ((Base)dummyData["dummyChild"])["dummyName"] = "NamedChild";            
+
+            var objectId = await Operations.Send(dummyData, new List<ITransport> { transport }, disposeTransports: true);
 
             var commitCreated = await speckleClient.CommitCreate(new CommitCreateInput()
             {
                 streamId = stream,
                 branchName = "main",
                 message = "Test commit",
-                objectId
+                objectId = objectId
             });
 
-            Task.Delay(TimeSpan.FromSeconds(5)).Wait();
+            Task.Delay(TimeSpan.FromSeconds(15)).Wait();
 
             var getResponse = await client.GetAsync("results").Result.Content.ReadFromJsonAsync<JsonElement>();
 
