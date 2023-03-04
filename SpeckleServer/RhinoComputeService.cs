@@ -25,13 +25,13 @@ public class RhinoComputeService
 
     private bool jobQueueIsCurrentlyIterating = false;
 
-    private readonly string _token;
+    private readonly string _speckleToken;
 
     public RhinoComputeService(IServiceScopeFactory scopeFactory, IConfiguration configuration)
     {
         _scopeFactory = scopeFactory;
         _rhinoComputeUrl = configuration.GetValue<string>("Rhino:ComputeUrl") ?? "";
-        _token = configuration.GetValue<string>("SpeckleListener:XYZKey") ?? "";
+        _speckleToken = configuration.GetValue<string>("SpeckleListener:XYZKey") ?? "";
 
         _client = new HttpClient()
         {
@@ -49,7 +49,7 @@ public class RhinoComputeService
         var ticket = new JobTicket(key);
 
 
-        jobDoers.Enqueue(new Job(stream,_token,algo));
+        jobDoers.Enqueue(new Job(stream,_speckleToken,algo));
 
         if (jobQueueIsCurrentlyIterating) return ticket;
 

@@ -119,14 +119,14 @@ app.MapPut("/jobs/new", (NewJobScema jobSchema, [FromServices] AutomationDbConte
 
     var command = jobSchema.command;
 
-    var urls = new[] { jobSchema.targetPath, jobSchema.destinationPath }.Select(x => sl.ValidateWildcardSpeckleStream(x));
+    var urls = new[] { jobSchema.targetPath, jobSchema.destinationPath }.Select(x => new SpeckleUrl(x));
 
     foreach (var result in urls)
     {
-        if (!result.isValid) return Results.BadRequest("Invalid Speckle stream");
+        if (!result.IsValid) return Results.BadRequest("Invalid Speckle stream");
 
-        var stream = result.stream;
-        var key = result.key;
+        var stream = result.Stream;
+        var key = result.Key;
 
         if (stream.Contains('*') || string.IsNullOrWhiteSpace(stream)) return Results.BadRequest("A stream cannot be empty or a wildcard value");
 
@@ -139,14 +139,14 @@ app.MapPut("/jobs/new", (NewJobScema jobSchema, [FromServices] AutomationDbConte
 
     if (commandRecord == null) return Results.BadRequest($"Command {command} does not exist");
 
-    if (commandRecord.Jobs.Where(x=>x.StreamId == target.stream).SingleOrDefault() is not null)
+    if (commandRecord.Jobs.Where(x=>x.StreamId == target.Stream).SingleOrDefault() is not null)
     {
         return Results.Ok();        
     }
 
-    var streamRecord = db.Streams.Find(target.stream) is SpeckleServer.Database.Stream str
+    var streamRecord = db.Streams.Find(target.Stream) is SpeckleServer.Database.Stream str
         ? db.Streams.Attach(str).Entity
-        : db.Streams.Add(new SpeckleServer.Database.Stream() { StreamId = target.stream }).Entity;
+        : db.Streams.Add(new SpeckleServer.Database.Stream() { StreamId = target.Stream }).Entity;
 
     var job = db.Jobs.Add(new SpeckleServer.Database.Job()
     {

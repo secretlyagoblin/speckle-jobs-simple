@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Speckle.Core.Api.SubscriptionModels;
 using SpeckleServer.Database;
+using System.Threading.Tasks;
 
 namespace SpeckleServer.RhinoJobber
 {
@@ -17,51 +18,36 @@ namespace SpeckleServer.RhinoJobber
             _scopeFactory = scopeFactory;
         }
 
-        public void RunCommandFromCommit(CommitInfo commit)
-        {
-            var tasks = _context.Streams
-                .Where(x => x.StreamId == commit.streamId)
-                .Include(x => x.Jobs)
-                .ThenInclude(x => x.Command)
-                .ThenInclude(x => x.AutomationHistory)
-                .SelectMany(x => x.Jobs)
-                .Select(x => x.Command.AutomationHistory.Last());
-            //.Async(TryRunGrasshopperScript,cancellationToken) ?? Task.CompletedTask;
-
-        }
-
-        public void RunCommandFromStream(string streamId)
-        {
-            var tasks = _context.Streams                
+        public IEnumerable<JobTicket> RunCommandFromStream(string server, string streamId, string branch) => _context
+                .Streams
                 .Include(x => x.Jobs)
                 .ThenInclude(x => x.Command)
                 .ThenInclude(x => x.AutomationHistory)
                 .Where(x => x.StreamId == streamId)
                 .ToList()
                 .SelectMany(x => x.Jobs)
-                .Select(x => x.Command.AutomationHistory.Last());
-            //.Async(TryRunGrasshopperScript,cancellationToken) ?? Task.CompletedTask;
+                .Where(x => new SpeckleUrl(x.TriggeringUrl).MatchesBranchPattern(branch))
+                .Select(x => RunCommandByName(x.Command.Name, new CommandRunSettings(
+                    commitUrl: $"{server}/streams/{streamId}/branches/{branch}")))
+                .ToList();
 
-        }
-
-        public JobTicket RunCommandByName(string command, CommandRunSettings runSettings)
+        private JobTicket RunAutomation(Automation automation, CommandRunSettings runSettings)
         {
-            var task = _context.Commands
-                .Where(x => x.Name == command)
-                .Include(x => x.AutomationHistory)
-                .Select(x => x.AutomationHistory.Last()).Single();
-
-            var computer = _scopeFactory.CreateScope().ServiceProvider.GetService(typeof(RhinoComputeService)) as RhinoComputeService;
-
-            if(computer is null)
+            if (_scopeFactory.CreateScope().ServiceProvider.GetService(typeof(RhinoComputeService)) is not RhinoComputeService computer)
             {
                 throw new Exception("Rhino Compute Service could not be started");
             }
 
-
-             
-            return computer.StartJob(runSettings.commitUrl, task.GhString);
+            return computer.StartJob(runSettings.commitUrl, automation.GhString);
         }
+
+        public JobTicket RunCommandByName(string command, CommandRunSettings runSettings) => _context
+                .Commands
+                .Where(x => x.Name == command)
+                .Include(x => x.AutomationHistory)
+                .Select(x => x.AutomationHistory.Last())
+                .Select(x => RunAutomation(x, runSettings))
+                .Single();
     }
 
 }

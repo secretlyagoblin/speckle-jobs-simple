@@ -23,7 +23,7 @@ public class SpeckleListenerService
         account.token = configuration.GetValue<string>("SpeckleListener:XYZKey");
         account.serverInfo = new ServerInfo
         {
-            url = "https://speckle.xyz/"
+            url = "https://speckle.xyz"
         };
 
         _client = new Client(account);
@@ -46,36 +46,12 @@ public class SpeckleListenerService
     {
         using var scope = _scopeFactory.CreateScope();
         var rj = scope.ServiceProvider.GetRequiredService<RhinoJobService>();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AutomationDbContext>();
 
-
-
-
-    
+        rj.RunCommandFromStream(_client.ServerUrl, e.streamId, e.branchName);
     }
 
-    public SpeckleUrl ValidateWildcardSpeckleStream(string url)
-    {
-        string preamble, serverUrl, stream, path, key, value;
 
-        //look, sorry, I was trying to be clever
-        var pattern = $"(?<{nameof(preamble)}>(?<{nameof(serverUrl)}>.+\\.+\\w+\\/)?(?:.*streams\\/)?)(?<{nameof(stream)}>[\\w\\*]+)\\/(?<{nameof(path)}>(?<{nameof(key)}>\\w+)\\/(?<{nameof(value)}>[^\\?]+))";
-        var regex = new Regex(pattern);
-        var match = regex.Match(url);
-
-        if (!match.Success) return new SpeckleUrl(false, "", "", "", "", "", "");
-
-        //still sorry, I was still trying to be clever
-        preamble = match.Groups.GetValueOrDefault(nameof(preamble))?.Value ?? "";
-        serverUrl = match.Groups.GetValueOrDefault(nameof(serverUrl))?.Value ?? "";
-        stream = match.Groups.GetValueOrDefault(nameof(stream))?.Value ?? "";
-        path = match.Groups.GetValueOrDefault(nameof(path))?.Value ?? "";
-        key = match.Groups.GetValueOrDefault(nameof(key))?.Value ?? "";
-        value = match.Groups.GetValueOrDefault(nameof(value))?.Value ?? "";
-
-        return new SpeckleUrl(true, preamble,serverUrl, stream, path, key, value);
-    }
-
-    public record SpeckleUrl(bool isValid, string preamble, string serverUrl, string stream, string path, string key, string value);
 
 
 

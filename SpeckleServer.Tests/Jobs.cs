@@ -27,7 +27,7 @@ namespace SpeckleServer.Tests
             _speckleStream = "111xxx111";
             _command = $"/commands/{_commandName}";
 
-            _client.PutAsJsonAsync(_command, new Command(_commandName));
+            _client.PutAsJsonAsync(_command, new Command("sadsad"));
         }
 
         [TearDown]
