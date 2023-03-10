@@ -12,7 +12,6 @@ public class SpeckleListener
 
     private readonly IServiceScopeFactory _scopeFactory;
 
-    private string _rhinoComputeUrl = "http://localhost:5000";
     private readonly Client _client;
 
     public SpeckleListener(IServiceScopeFactory scopeFactory, IConfiguration configuration)
