@@ -72,7 +72,7 @@ public class RhinoComputeService
 
     private void RunJobOnCompute(Job job)
     {
-        if (!_client.GetAsync("/_debug").Wait(1))
+        if (!_client.GetAsync("/_debug").Wait(TimeSpan.FromSeconds(1)))
         {
             computeJobs.Enqueue("Rhino.Compute server is not running");
             return;
