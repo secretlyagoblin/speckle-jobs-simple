@@ -7,7 +7,7 @@ using SpeckleServer.RhinoJobber;
 using System.Collections;
 using System.Text.RegularExpressions;
 
-public class SpeckleListenerService 
+public class SpeckleListener 
 {
 
     private readonly IServiceScopeFactory _scopeFactory;
@@ -15,7 +15,7 @@ public class SpeckleListenerService
     private string _rhinoComputeUrl = "http://localhost:5000";
     private readonly Client _client;
 
-    public SpeckleListenerService(IServiceScopeFactory scopeFactory, IConfiguration configuration)
+    public SpeckleListener(IServiceScopeFactory scopeFactory, IConfiguration configuration)
     {
         _scopeFactory = scopeFactory;
 

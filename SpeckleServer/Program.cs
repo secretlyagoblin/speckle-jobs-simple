@@ -11,8 +11,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 
-builder.Services.AddSingleton<SpeckleListenerService>();
-builder.Services.AddSingleton<RhinoComputeService>();
+builder.Services.AddHostedService<ListenerService>();
+builder.Services.AddSingleton<SpeckleListener>();
+builder.Services.AddSingleton<RhinoComputeListener>();
 builder.Services.AddScoped<RhinoJobService>();
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -22,12 +23,12 @@ builder.Services.AddDbContext<AutomationDbContext>(options => options.UseInMemor
 
 var app = builder.Build();
 
-app.MapPost("/start", ([FromServices] SpeckleListenerService speckle, [FromServices] RhinoJobService rhino ) =>
+app.MapPost("/start", ([FromServices] SpeckleListener speckle, [FromServices] RhinoJobService rhino ) =>
 {
     throw new NotImplementedException(); //should start the speckle service if it hasn't started yet and to ensure consistent behaviour should trigger a tag
 });
 
-app.MapPost("/stop", ([FromServices] SpeckleListenerService service, [FromServices] RhinoJobService rhino) =>
+app.MapPost("/stop", ([FromServices] SpeckleListener service, [FromServices] RhinoJobService rhino) =>
 {
     throw new NotImplementedException(); //should disconnect the Speckle listener
 });
@@ -115,7 +116,7 @@ app.MapGet("/jobs", ([FromServices] AutomationDbContext db) => {
     .ToList();;
 });
 
-app.MapPut("/jobs/new", (NewJobScema jobSchema, [FromServices] AutomationDbContext db, [FromServices] SpeckleListenerService sl) => {
+app.MapPut("/jobs/new", (NewJobScema jobSchema, [FromServices] AutomationDbContext db, [FromServices] SpeckleListener sl) => {
 
     var command = jobSchema.command;
 
@@ -201,7 +202,7 @@ app.MapGet("/history", (int count, int offset, [FromServices] AutomationDbContex
     });
 });
 
-app.MapGet("/results", ([FromServices] RhinoComputeService rc) =>
+app.MapGet("/results", ([FromServices] RhinoComputeListener rc) =>
 {
     return rc.computeJobs.Select(x =>
     new {

@@ -12,7 +12,7 @@ using System.Diagnostics.Metrics;
 using System.Text.Json;
 using System;
 
-public class RhinoComputeService 
+public class RhinoComputeListener 
 {
 
     private readonly IServiceScopeFactory _scopeFactory;
@@ -27,7 +27,7 @@ public class RhinoComputeService
 
     private readonly string _speckleToken;
 
-    public RhinoComputeService(IServiceScopeFactory scopeFactory, IConfiguration configuration)
+    public RhinoComputeListener(IServiceScopeFactory scopeFactory, IConfiguration configuration)
     {
         _scopeFactory = scopeFactory;
         _rhinoComputeUrl = configuration.GetValue<string>("Rhino:ComputeUrl") ?? "";

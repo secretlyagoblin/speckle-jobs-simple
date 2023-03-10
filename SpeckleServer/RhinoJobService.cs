@@ -33,7 +33,7 @@ namespace SpeckleServer.RhinoJobber
 
         private JobTicket RunAutomation(Automation automation, CommandRunSettings runSettings)
         {
-            if (_scopeFactory.CreateScope().ServiceProvider.GetService(typeof(RhinoComputeService)) is not RhinoComputeService computer)
+            if (_scopeFactory.CreateScope().ServiceProvider.GetService(typeof(RhinoComputeListener)) is not RhinoComputeListener computer)
             {
                 throw new Exception("Rhino Compute Service could not be started");
             }
