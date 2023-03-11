@@ -68,11 +68,9 @@ namespace SpeckleSync.Files
 
         private void _fileSystemWatcher_Created(object sender, FileSystemEventArgs e)
         {
-            using (var scope = _serviceProvider.CreateScope())
-            {
-                var consumerService = scope.ServiceProvider.GetRequiredService<IFileConsumerService>();
-                Task.Run(() => consumerService.ConsumeFile(e.FullPath));
-            }
+            using var scope = _serviceProvider.CreateScope();
+            var consumerService = scope.ServiceProvider.GetRequiredService<Pusher>();
+            consumerService.RegisterJob(new FileJob(e.FullPath));
         }
     }
 }

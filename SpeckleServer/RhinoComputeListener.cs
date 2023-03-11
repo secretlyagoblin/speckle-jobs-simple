@@ -12,16 +12,16 @@ using System.Diagnostics.Metrics;
 using System.Text.Json;
 using System;
 
-public class RhinoComputeListener 
+public class RhinoComputeListener : IRhinoComputeListener
 {
 
     private readonly IServiceScopeFactory _scopeFactory;
 
     private string _rhinoComputeUrl = "http://localhost:5000";
     private readonly HttpClient _client;
-    private readonly ConcurrentQueue<Job> jobDoers= new ConcurrentQueue<Job>();
+    private readonly ConcurrentQueue<Job> jobDoers = new ConcurrentQueue<Job>();
 
-    public ConcurrentQueue<string> computeJobs = new ConcurrentQueue<string>();
+    private ConcurrentQueue<string> computeJobs = new ConcurrentQueue<string>();
 
     private bool jobQueueIsCurrentlyIterating = false;
 
@@ -49,7 +49,7 @@ public class RhinoComputeListener
         var ticket = new JobTicket(key);
 
 
-        jobDoers.Enqueue(new Job(stream,_speckleToken,algo));
+        jobDoers.Enqueue(new Job(stream, _speckleToken, algo));
 
         if (jobQueueIsCurrentlyIterating) return ticket;
 
@@ -57,9 +57,9 @@ public class RhinoComputeListener
 
         Task.Run(() =>
         {
-            while(jobQueueIsCurrentlyIterating && !jobDoers.IsEmpty)
+            while (jobQueueIsCurrentlyIterating && !jobDoers.IsEmpty)
             {
-                if(jobDoers.TryDequeue(out var job) && job is not null)
+                if (jobDoers.TryDequeue(out var job) && job is not null)
                 {
                     RunJobOnCompute(job);
                 }
@@ -130,11 +130,14 @@ public class RhinoComputeListener
             var script = _client.PostAsJsonAsync("/grasshopper", schema).Result.Content.ReadFromJsonAsync<JsonElement>().Result;
             computeJobs.Enqueue(script.GetRawText());
 
-        }catch(Exception ex)
+        }
+        catch (Exception ex)
         {
             computeJobs.Enqueue(ex.Message);
         }
     }
+
+    public IEnumerable<string> GetLatestJobsAndClearQueue() => computeJobs.ToList();
 
 
 }

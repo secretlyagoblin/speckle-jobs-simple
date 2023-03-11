@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 
 namespace SpeckleServer.RhinoJobber
 {
-    internal class RhinoJobService
+    internal class RhinoJobService : IRhinoJobService
     {
 
         private readonly AutomationDbContext _context;
@@ -33,7 +33,7 @@ namespace SpeckleServer.RhinoJobber
 
         private JobTicket RunAutomation(Automation automation, CommandRunSettings runSettings)
         {
-            if (_scopeFactory.CreateScope().ServiceProvider.GetService(typeof(RhinoComputeListener)) is not RhinoComputeListener computer)
+            if (_scopeFactory.CreateScope().ServiceProvider.GetService(typeof(IRhinoComputeListener)) is not IRhinoComputeListener computer)
             {
                 throw new Exception("Rhino Compute Service could not be started");
             }

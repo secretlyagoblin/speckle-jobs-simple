@@ -21,7 +21,7 @@ namespace SpeckleSync
             {
                 _logger.Log(LogLevel.Information, "Yep Still goin");
 
-                await Task.Delay(TimeSpan.FromSeconds(60), stoppingToken);
+                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
             }
         }
     }

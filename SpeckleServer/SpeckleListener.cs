@@ -7,7 +7,7 @@ using SpeckleServer.RhinoJobber;
 using System.Collections;
 using System.Text.RegularExpressions;
 
-public class SpeckleListener 
+public class SpeckleListener : ISpeckleListener
 {
 
     private readonly IServiceScopeFactory _scopeFactory;
@@ -33,7 +33,8 @@ public class SpeckleListener
         //https://learn.microsoft.com/en-us/aspnet/core/fundamentals/host/hosted-services?view=aspnetcore-7.0&tabs=visual-studio
     }
 
-    public void UpdateStreams() {
+    public void UpdateStreams()
+    {
 
         using var scope = _scopeFactory.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AutomationDbContext>();
@@ -44,7 +45,7 @@ public class SpeckleListener
     private void Client_OnCommitCreated(object sender, Speckle.Core.Api.SubscriptionModels.CommitInfo e)
     {
         using var scope = _scopeFactory.CreateScope();
-        var rj = scope.ServiceProvider.GetRequiredService<RhinoJobService>();
+        var rj = scope.ServiceProvider.GetRequiredService<IRhinoJobService>();
         var dbContext = scope.ServiceProvider.GetRequiredService<AutomationDbContext>();
 
         rj.RunCommandFromStream(_client.ServerUrl, e.streamId, e.branchName);

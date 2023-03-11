@@ -12,9 +12,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 
 builder.Services.AddHostedService<ListenerService>();
-builder.Services.AddSingleton<SpeckleListener>();
-builder.Services.AddSingleton<RhinoComputeListener>();
-builder.Services.AddScoped<RhinoJobService>();
+builder.Services.AddSingleton<ISpeckleListener, SpeckleListener>();
+builder.Services.AddSingleton<IRhinoComputeListener, RhinoComputeListener>();
+builder.Services.AddScoped<IRhinoJobService, RhinoJobService>();
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
@@ -22,16 +22,6 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddDbContext<AutomationDbContext>(options => options.UseInMemoryDatabase("items"));
 
 var app = builder.Build();
-
-app.MapPost("/start", ([FromServices] SpeckleListener speckle, [FromServices] RhinoJobService rhino ) =>
-{
-    throw new NotImplementedException(); //should start the speckle service if it hasn't started yet and to ensure consistent behaviour should trigger a tag
-});
-
-app.MapPost("/stop", ([FromServices] SpeckleListener service, [FromServices] RhinoJobService rhino) =>
-{
-    throw new NotImplementedException(); //should disconnect the Speckle listener
-});
 
 app.MapGet("/commands", ([FromServices] AutomationDbContext db) => {
     return db.Commands
@@ -100,7 +90,7 @@ app.MapPut("/commands/{command}", (string command, Command commandPayload, [From
 
 });
 
-app.MapPost("/command/{command}/run", (string command, CommandRunSettings runSettings, [FromServices] RhinoJobService rh) =>
+app.MapPost("/command/{command}/run", (string command, CommandRunSettings runSettings, [FromServices] IRhinoJobService rh) =>
 {
     return rh.RunCommandByName(command, runSettings );
 });
@@ -116,7 +106,7 @@ app.MapGet("/jobs", ([FromServices] AutomationDbContext db) => {
     .ToList();;
 });
 
-app.MapPut("/jobs/new", (NewJobScema jobSchema, [FromServices] AutomationDbContext db, [FromServices] SpeckleListener sl) => {
+app.MapPut("/jobs/new", (NewJobScema jobSchema, [FromServices] AutomationDbContext db, [FromServices] ISpeckleListener sl) => {
 
     var command = jobSchema.command;
 
@@ -202,9 +192,9 @@ app.MapGet("/history", (int count, int offset, [FromServices] AutomationDbContex
     });
 });
 
-app.MapGet("/results", ([FromServices] RhinoComputeListener rc) =>
+app.MapGet("/results", ([FromServices] IRhinoComputeListener rc) =>
 {
-    return rc.computeJobs.Select(x =>
+    return rc.GetLatestJobsAndClearQueue().Select(x =>
     new {
         job = x
     });

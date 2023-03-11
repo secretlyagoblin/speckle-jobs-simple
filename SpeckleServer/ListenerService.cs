@@ -2,10 +2,10 @@ namespace SpeckleServer
 {
     public class ListenerService : BackgroundService
     {
-        private readonly SpeckleListener _speckleListener;
-        private readonly RhinoComputeListener _rhinoListener;
+        private readonly ISpeckleListener _speckleListener;
+        private readonly IRhinoComputeListener _rhinoListener;
 
-        public ListenerService(SpeckleListener speckleListener, RhinoComputeListener rhinoListener)
+        public ListenerService(ISpeckleListener speckleListener, IRhinoComputeListener rhinoListener)
         {
             this._speckleListener = speckleListener;
             this._rhinoListener = rhinoListener;
