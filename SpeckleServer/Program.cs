@@ -7,218 +7,236 @@ using SpeckleServer.RhinoJobber;
 using System.Linq;
 using System.Text.RegularExpressions;
 
-var builder = WebApplication.CreateBuilder(args);
+namespace SpeckleServer
+{
 
-builder.Services.AddControllers();
-
-builder.Services.AddHostedService<ListenerService>();
-builder.Services.AddSingleton<ISpeckleListener, SpeckleListener>();
-builder.Services.AddSingleton<IRhinoComputeListener, RhinoComputeListener>();
-builder.Services.AddScoped<IRhinoJobService, RhinoJobService>();
-
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-builder.Services.AddDbContext<AutomationDbContext>(options => options.UseInMemoryDatabase("items"));
-
-var app = builder.Build();
-
-app.MapGet("/commands", ([FromServices] AutomationDbContext db) => {
-    return db.Commands
-    .Include(x => x.AutomationHistory)
-    .Select(x => new
+    public class Program
     {
-        name = x.Name,
-        versions = x.AutomationHistory.Count
-    })
-    .ToList();
-});
-
-app.MapGet("/commands/{command}", (string command, [FromServices] AutomationDbContext db) => {
-    return db.Commands
-    .Where(x => x.Name == command)
-    .Include(x => x.AutomationHistory)
-    .Select(x => new
-    {
-        name = x.Name,
-        versions = x.AutomationHistory.Select(y =>
-        new
+        private static void Main(string[] args)
         {
-            id = y.AutomationId,
-            date = y.DateTime
-        })
-    })
-    .ToList();
-});
+            var builder = WebApplication.CreateBuilder(args);
 
-app.MapPut("/commands/{command}", (string command, Command commandPayload, [FromServices] AutomationDbContext db) =>{
+            builder.Services.AddControllers();
 
-    if (string.IsNullOrEmpty(command))
-    {
-        return Results.BadRequest("Invalid command");
-    }
+            builder.Services.AddHostedService<ListenerService>();
+            builder.Services.AddSingleton<ISpeckleListener, SpeckleListener>();
+            builder.Services.AddSingleton<IRhinoComputeListener, RhinoComputeListener>();
+            builder.Services.AddScoped<IRhinoJobService, RhinoJobService>();
 
-    if (commandPayload?.GhString is null)
-    {
-        return Results.BadRequest("Invalid command payload");
-    }
+            // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+            builder.Services.AddEndpointsApiExplorer();
+            builder.Services.AddSwaggerGen();
+            builder.Services.AddDbContext<AutomationDbContext>(options => options.UseInMemoryDatabase("items"));
 
-    try
-    {
+            var app = builder.Build();
 
-        var automation = db.Automations.Add(new Automation()
-        {
-            GhString = commandPayload.GhString
-        }).Entity;
+            app.MapGet("/commands", ([FromServices] AutomationDbContext db) =>
+            {
+                return db.Commands
+                .Include(x => x.AutomationHistory)
+                .Select(x => new
+                {
+                    name = x.Name,
+                    versions = x.AutomationHistory.Count
+                })
+                .ToList();
+            });
 
-        var namedStep = db.Commands.Find(command) is SpeckleServer.Database.Command n
-            ? db.Commands.Attach(n).Entity
-            : db.Commands.Add(new SpeckleServer.Database.Command() { Name = command }).Entity;
+            app.MapGet("/commands/{command}", (string command, [FromServices] AutomationDbContext db) =>
+            {
+                return db.Commands
+                .Where(x => x.Name == command)
+                .Include(x => x.AutomationHistory)
+                .Select(x => new
+                {
+                    name = x.Name,
+                    versions = x.AutomationHistory.Select(y =>
+                    new
+                    {
+                        id = y.AutomationId,
+                        date = y.DateTime
+                    })
+                })
+                .ToList();
+            });
 
-        namedStep.AutomationHistory.Add(automation);
+            app.MapPut("/commands/{command}", (string command, Command commandPayload, [FromServices] AutomationDbContext db) =>
+            {
 
-        //var changes = db.ChangeTracker.ToDebugString();
+                if (string.IsNullOrEmpty(command))
+                {
+                    return Results.BadRequest("Invalid command");
+                }
 
-        db.SaveChanges();
+                if (commandPayload?.GhString is null)
+                {
+                    return Results.BadRequest("Invalid command payload");
+                }
 
-    } catch(Exception ex)
-    {
-        return Results.BadRequest($"Failed to load request: {ex.Message}");
-    }
+                try
+                {
 
-    return Results.Ok();
+                    var automation = db.Automations.Add(new Automation()
+                    {
+                        GhString = commandPayload.GhString
+                    }).Entity;
 
-});
+                    var namedStep = db.Commands.Find(command) is SpeckleServer.Database.Command n
+                        ? db.Commands.Attach(n).Entity
+                        : db.Commands.Add(new SpeckleServer.Database.Command() { Name = command }).Entity;
 
-app.MapPost("/command/{command}/run", (string command, CommandRunSettings runSettings, [FromServices] IRhinoJobService rh) =>
-{
-    return rh.RunCommandByName(command, runSettings );
-});
+                    namedStep.AutomationHistory.Add(automation);
 
-app.MapGet("/jobs", ([FromServices] AutomationDbContext db) => {
-    return db.Jobs
-    .Select(x => new
-    {
-        stream = x.StreamId,
-        command = x.CommandId,
-        hint = x.DestinationUrlHint,
-    })
-    .ToList();;
-});
+                    //var changes = db.ChangeTracker.ToDebugString();
 
-app.MapPut("/jobs/new", (NewJobScema jobSchema, [FromServices] AutomationDbContext db, [FromServices] ISpeckleListener sl) => {
+                    db.SaveChanges();
 
-    var command = jobSchema.command;
+                }
+                catch (Exception ex)
+                {
+                    return Results.BadRequest($"Failed to load request: {ex.Message}");
+                }
 
-    var urls = new[] { jobSchema.targetPath, jobSchema.destinationPath }.Select(x => new SpeckleUrl(x));
+                return Results.Ok();
 
-    foreach (var result in urls)
-    {
-        if (!result.IsValid) return Results.BadRequest("Invalid Speckle stream");
+            });
 
-        var stream = result.Stream;
-        var key = result.Key;
+            app.MapPost("/command/{command}/run", (string command, CommandRunSettings runSettings, [FromServices] IRhinoJobService rh) =>
+            {
+                return rh.RunCommandByName(command, runSettings);
+            });
 
-        if (stream.Contains('*') || string.IsNullOrWhiteSpace(stream)) return Results.BadRequest("A stream cannot be empty or a wildcard value");
+            app.MapGet("/jobs", ([FromServices] AutomationDbContext db) =>
+            {
+                return db.Jobs
+                .Select(x => new
+                {
+                    stream = x.StreamId,
+                    command = x.CommandId,
+                    hint = x.DestinationUrlHint,
+                })
+                .ToList(); ;
+            });
 
-        if (key is not "branches") return Results.BadRequest("We can only create requests for branches at the moment");
-    }
+            app.MapPut("/jobs/new", (NewJobScema jobSchema, [FromServices] AutomationDbContext db, [FromServices] ISpeckleListener sl) =>
+            {
 
-    var target = urls.First();
+                var command = jobSchema.command;
 
-    var commandRecord = db.Commands.Where(x => x.Name == command).Include(x => x.Jobs).SingleOrDefault();
+                var urls = new[] { jobSchema.targetPath, jobSchema.destinationPath }.Select(x => new SpeckleUrl(x));
 
-    if (commandRecord == null) return Results.BadRequest($"Command {command} does not exist");
+                foreach (var result in urls)
+                {
+                    if (!result.IsValid) return Results.BadRequest("Invalid Speckle stream");
 
-    if (commandRecord.Jobs.Where(x=>x.StreamId == target.Stream).SingleOrDefault() is not null)
-    {
-        return Results.Ok();        
-    }
+                    var stream = result.Stream;
+                    var key = result.Key;
 
-    var streamRecord = db.Streams.Find(target.Stream) is SpeckleServer.Database.Stream str
-        ? db.Streams.Attach(str).Entity
-        : db.Streams.Add(new SpeckleServer.Database.Stream() { StreamId = target.Stream }).Entity;
+                    if (stream.Contains('*') || string.IsNullOrWhiteSpace(stream)) return Results.BadRequest("A stream cannot be empty or a wildcard value");
 
-    var job = db.Jobs.Add(new SpeckleServer.Database.Job()
-    {
-        Command = commandRecord,
-        Stream = streamRecord,
-        TriggeringUrl = jobSchema.targetPath,
-        DestinationUrlHint = jobSchema.destinationPath
-    });
+                    if (key is not "branches") return Results.BadRequest("We can only create requests for branches at the moment");
+                }
 
-    db.SaveChanges();
+                var target = urls.First();
 
-    sl.UpdateStreams();
+                var commandRecord = db.Commands.Where(x => x.Name == command).Include(x => x.Jobs).SingleOrDefault();
 
-    return Results.Ok();
-});
+                if (commandRecord == null) return Results.BadRequest($"Command {command} does not exist");
 
-app.MapGet("/streams", ([FromServices] AutomationDbContext db) => {
-    return db.Streams
-    .Include(x => x.Jobs)
-    .Select(x => new
-    {
-        name = x.StreamId,
-        jobs = x.Jobs.Select(x => x.CommandId)
-    })
-    .ToList();
-});
+                if (commandRecord.Jobs.Where(x => x.StreamId == target.Stream).SingleOrDefault() is not null)
+                {
+                    return Results.Ok();
+                }
 
-app.MapGet("/streams/{stream}", (string stream, [FromServices] AutomationDbContext db) => {
-    return db.Streams
-    .Where(x => x.StreamId == stream)
-    .Include(x => x.Jobs)
-    .Select(x => new
-    {
-        name = x.StreamId,
-        jobs = x.Jobs.Select(x => x.CommandId)
-    })
-    .SingleOrDefault();
-});
+                var streamRecord = db.Streams.Find(target.Stream) is SpeckleServer.Database.Stream str
+                    ? db.Streams.Attach(str).Entity
+                    : db.Streams.Add(new SpeckleServer.Database.Stream() { StreamId = target.Stream }).Entity;
 
-app.MapGet("/history", (int count, int offset, [FromServices] AutomationDbContext db) =>
-{
-    var query = db.Automations.Reverse().Skip(offset);
+                var job = db.Jobs.Add(new SpeckleServer.Database.Job()
+                {
+                    Command = commandRecord,
+                    Stream = streamRecord,
+                    TriggeringUrl = jobSchema.targetPath,
+                    DestinationUrlHint = jobSchema.destinationPath
+                });
 
-    if (count > 0) query = query.Take(count);
+                db.SaveChanges();
 
-    return query.Include(x => x.Command).Select(x =>
-    new
-    {
-        id = x.AutomationId,
-        date = x.DateTime,
-        name = x.Command.Name
-    });
-});
+                sl.UpdateStreams();
 
-app.MapGet("/results", ([FromServices] IRhinoComputeListener rc) =>
-{
-    return rc.GetLatestJobsAndClearQueue().Select(x =>
-    new {
-        job = x
-    });
-});
+                return Results.Ok();
+            });
+
+            app.MapGet("/streams", ([FromServices] AutomationDbContext db) =>
+            {
+                return db.Streams
+                .Include(x => x.Jobs)
+                .Select(x => new
+                {
+                    name = x.StreamId,
+                    jobs = x.Jobs.Select(x => x.CommandId)
+                })
+                .ToList();
+            });
+
+            app.MapGet("/streams/{stream}", (string stream, [FromServices] AutomationDbContext db) =>
+            {
+                return db.Streams
+                .Where(x => x.StreamId == stream)
+                .Include(x => x.Jobs)
+                .Select(x => new
+                {
+                    name = x.StreamId,
+                    jobs = x.Jobs.Select(x => x.CommandId)
+                })
+                .SingleOrDefault();
+            });
+
+            app.MapGet("/history", (int count, int offset, [FromServices] AutomationDbContext db) =>
+            {
+                var query = db.Automations.Reverse().Skip(offset);
+
+                if (count > 0) query = query.Take(count);
+
+                return query.Include(x => x.Command).Select(x =>
+                new
+                {
+                    id = x.AutomationId,
+                    date = x.DateTime,
+                    name = x.Command.Name
+                });
+            });
+
+            app.MapGet("/results", ([FromServices] IRhinoComputeListener rc) =>
+            {
+                return rc.GetLatestJobsAndClearQueue().Select(x =>
+                new
+                {
+                    job = x
+                });
+            });
 
 
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
+            // Configure the HTTP request pipeline.
+            if (app.Environment.IsDevelopment())
+            {
+                app.UseSwagger();
+                app.UseSwaggerUI();
+            }
+
+            app.UseHttpsRedirection();
+
+            app.UseAuthorization();
+
+            app.MapControllers();
+
+            app.Run();
+        }
+    } 
+
+    public record NewJobScema(string targetPath, string destinationPath, string command);
+    public record Command(string GhString);
+    public record CommandRunSettings(string commitUrl);
+
 }
-
-app.UseHttpsRedirection();
-
-app.UseAuthorization();
-
-app.MapControllers();
-
-app.Run();
-
-public partial class Program{ } // to expose tests
-
-public record NewJobScema(string targetPath, string destinationPath, string command);
-public record Command(string GhString);
-public record CommandRunSettings(string commitUrl);

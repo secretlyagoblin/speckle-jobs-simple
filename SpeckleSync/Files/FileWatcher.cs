@@ -18,6 +18,9 @@ namespace SpeckleSync.Files
         {
             _targetDirectory = configuration.GetValue<string>("TargetDirectory") ?? "";            
             _logger = logger;
+
+            var path = Path.GetFullPath(_targetDirectory);
+
             if(!Directory.Exists(_targetDirectory))
                 Directory.CreateDirectory(_targetDirectory);
             _fileSystemWatcher = new FileSystemWatcher(_targetDirectory, _fileFilter);

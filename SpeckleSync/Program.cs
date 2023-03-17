@@ -2,13 +2,22 @@ using SpeckleSync;
 using SpeckleSync.Files;
 using System.Net.Http;
 
-var builder = Host.CreateApplicationBuilder(args);
+namespace SpeckleSync
+{
+    public class Program
+    {
+        private static void Main(string[] args)
+        {
+            var host = Host.CreateDefaultBuilder(args)
+                .ConfigureServices((hostContext, services) =>
+                {
+                    services.AddHostedService<Worker>()
+                        .AddSingleton<IFileWatcher, FileWatcher>()
+                        .AddSingleton<Pusher>();
+                })
+                .Build();
 
-builder.Services
-    .AddHostedService<Worker>()
-    .AddSingleton<IFileWatcher, FileWatcher>()
-    .AddSingleton<Pusher>();
-
-var host = builder.Build();
-
-host.Run();
+            host.Run();
+        }
+    } 
+}

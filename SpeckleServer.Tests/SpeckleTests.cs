@@ -40,7 +40,7 @@ namespace SpeckleServer.Tests
 
         private Client CreateClient()
         {
-            var token = new ConfigurationBuilder().AddUserSecrets(typeof(Program).Assembly).Build().GetValue<string>("SpeckleListener:XYZKey") ?? "";
+            var token = new ConfigurationBuilder().AddUserSecrets(typeof(SpeckleServer.Program).Assembly).Build().GetValue<string>("SpeckleListener:XYZKey") ?? "";
 
             var account = new Account();
             account.token = token;
@@ -70,7 +70,7 @@ namespace SpeckleServer.Tests
 
             _streams.Add(stream); //ensures it gets wiped after test
 
-            await using var application = new WebApplicationFactory<Program>();
+            await using var application = new WebApplicationFactory<SpeckleServer.Program>();
             using var client = application.CreateClient();
 
             var commandName = "abcdef";

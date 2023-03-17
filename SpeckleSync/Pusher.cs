@@ -40,8 +40,6 @@ namespace SpeckleSync
         }
     }
 
-
-
     public class Pusher : JobberSingleton<FileJob>
     {
         private readonly ILogger _logger;
