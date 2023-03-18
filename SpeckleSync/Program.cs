@@ -1,5 +1,4 @@
 using SpeckleSync;
-using SpeckleSync.Files;
 using System.Net.Http;
 
 namespace SpeckleSync
@@ -11,17 +10,11 @@ namespace SpeckleSync
             var host = Host.CreateDefaultBuilder(args)
                 .ConfigureServices((hostContext, services) =>
                 {
-                    services
-                        .AddHttpClient(nameof(SpeckleServer), x => { x.BaseAddress = new Uri(hostContext.Configuration.GetValue<string>("SpeckleHttpService") ?? ""); });
+                    services.AddHttpClient();
+                    services.AddSingleton<IHostedService, DirectoryListenerService>();
+                });
 
-                    services
-                        .AddHostedService<Worker>()                        
-                        .AddSingleton<IFileWatcher, FileWatcher>()
-                        .AddTransient<Pusher>();
-                })
-                .Build();
-
-            host.Run();
+            host.Build().Run();
         }
     } 
 }

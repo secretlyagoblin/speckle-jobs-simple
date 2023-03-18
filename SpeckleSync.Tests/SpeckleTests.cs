@@ -17,10 +17,11 @@ using Speckle.Core.Models;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
-using SpeckleSync.Files;
 using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Hosting;
 using NUnit.Framework;
+using System.Net.Http;
+using System.Runtime;
 
 namespace SpeckleSync.Tests
 {
@@ -72,10 +73,8 @@ namespace SpeckleSync.Tests
             .AddJsonFile(settings, true, true)
             .Build();        
 
-        private IHostBuilder ConfigureSpeckleSync(string settings = "appsettings.SpeckleTest.json")
+        private IHostBuilder ConfigureSpeckleSync(HttpClient client)
         {
-            var configRoot = GetConfigurationRoot(settings);
-
             var builder = new HostBuilder()
             .ConfigureLogging(logging =>
             {
@@ -84,14 +83,9 @@ namespace SpeckleSync.Tests
                 logging.SetMinimumLevel(LogLevel.Debug);
             }).ConfigureServices((context, services) =>
             {
-                services.AddHttpClient(nameof(SpeckleServer), x => { x.BaseAddress = new Uri(configRoot.GetValue<string>("SpeckleHttpService") ?? ""); });
-
-
-
-                services.AddSingleton<IConfiguration>(configRoot);
-                services.AddHostedService<Worker>();
-                services.AddSingleton<IFileWatcher, FileWatcher>();
-                services.AddSingleton<Pusher>();
+                services.AddHttpClient(nameof(SpeckleServer), x => x.BaseAddress = client.BaseAddress);
+                services.AddSingleton<IConfiguration>(GetConfigurationRoot());
+                services.AddSingleton<IHostedService, DirectoryListenerService>();
             });
 
             return builder;
@@ -103,22 +97,57 @@ namespace SpeckleSync.Tests
             var appsettingsPath = "appsettings.SpeckleTest.json";
             var appsettings = GetConfigurationRoot(appsettingsPath) ?? throw new Exception("Could not get settings");
 
-
-            //setup app
-            IHost host = ConfigureSpeckleSync(appsettingsPath).Build();
-            Task runningHost = host.StartAsync(_hostCancellationToken.Token);
-
             //setup SpeckleXYZ client
             Client speckleXYZClient = CreateSpeckleClient();
+
+            var baseUrl = appsettings.GetValue<string>("SpeckleHttpService") ?? throw new Exception();
 
             //setup our Speckle server client (needs a better name)
             await using var daisy = new WebApplicationFactory<SpeckleServer.Program>()
                     .WithWebHostBuilder(builder =>
                     {
-                        builder.UseUrls(appsettings.GetValue<string>("SpeckleHttpService"));
+                        builder.UseUrls(baseUrl);
+
+                        //not sure if this is needed???
+                        builder.ConfigureServices(x =>
+                        {
+                            x.AddCors(o =>
+                            {
+                                o.AddPolicy("TestingPolicy", p =>
+                                {
+                                    p.AllowAnyOrigin();
+                                    p.AllowAnyMethod();
+                                    p.AllowAnyHeader();
+                                });
+                            });
+                        });
+
+                        builder.ConfigureLogging(logging =>
+                        {
+                            logging.ClearProviders();
+                            logging.AddConsole();
+                            logging.SetMinimumLevel(LogLevel.Debug);
+                        });
                     });
 
-            using HttpClient daisyClient = daisy.CreateClient();
+            using HttpClient daisyClient = daisy.CreateClient(new WebApplicationFactoryClientOptions()
+            {
+                BaseAddress = new Uri(baseUrl)
+            });
+
+            await daisyClient.GetAsync("/")
+                .ContinueWith(x =>
+                {
+                     if (x.Result.StatusCode == System.Net.HttpStatusCode.OK) return;
+                     throw new Exception(x.Result.StatusCode.ToString());
+                });
+
+            //setup app
+            IHost host = ConfigureSpeckleSync(daisyClient).Build();
+            Task runningHost = host.StartAsync(_hostCancellationToken.Token);
+
+
+
 
             string testStreamId;
 
@@ -138,12 +167,12 @@ namespace SpeckleSync.Tests
 
             // Step 2, add a Gh file to Sync folder
             {
-                var fullPath = Path.GetFullPath(appsettings.GetValue<string>("TargetDirectory"));
+                var fullPath = Path.GetFullPath(appsettings.GetValue<string>("TargetDirectory") ?? throw new Exception());
                 _testDirectories.Add(fullPath);
 
                 File.WriteAllText($"{fullPath}/{commandName}.gh", "This is a debug file and will fail");
 
-                await Task.Delay(TimeSpan.FromSeconds(5));
+                await Task.Delay(TimeSpan.FromSeconds(10));
             }
 
             //Step 3, configure Daisy Job

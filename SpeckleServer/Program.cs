@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using SpeckleServer;
 using SpeckleServer.Database;
 using SpeckleServer.RhinoJobber;
@@ -27,8 +30,9 @@ namespace SpeckleServer
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
             builder.Services.AddDbContext<AutomationDbContext>(options => options.UseInMemoryDatabase("items"));
-
             var app = builder.Build();
+
+            app.MapGet("/", () => "Hello World!");
 
             app.MapGet("/commands", ([FromServices] AutomationDbContext db) =>
             {
@@ -230,6 +234,18 @@ namespace SpeckleServer
             app.UseAuthorization();
 
             app.MapControllers();
+
+
+            var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
+            lifetime.ApplicationStarted.Register(() =>
+            {
+                var server = app.Services.GetRequiredService<IServer>();
+                var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("WebApplication");
+                var url = $"{server.Features.Get<IServerAddressesFeature>()?.Addresses.First() ?? throw new Exception()}";
+                logger.LogInformation("The application started. The URL of the application is: {url}", url);
+            });
+
+
 
             app.Run();
         }
