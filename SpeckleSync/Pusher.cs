@@ -40,20 +40,15 @@ namespace SpeckleSync
         }
     }
 
-    public class Pusher : JobberSingleton<FileJob>
+    public class Pusher
     {
         private readonly ILogger _logger;
-        private readonly HttpClient _client;
+        private readonly IHttpClientFactory _httpClientFactory;
 
-        public Pusher(IConfiguration configuration, ILogger<Pusher> logger) : base()
+        public Pusher(IConfiguration configuration, ILogger<Pusher> logger, IHttpClientFactory httpClientFactory) : base()
         {
             this._logger = logger;
-            var baseUrl = configuration.GetValue<string>("SpeckleHttpService") ?? "";
-
-            _client = new HttpClient()
-            {
-                BaseAddress = new Uri(baseUrl)
-            };
+            this._httpClientFactory = httpClientFactory;
         }
 
         public class Result : IResult
@@ -82,7 +77,7 @@ namespace SpeckleSync
 
 
 
-        protected override IResult RunJob(FileJob job)
+        public async Task<IResult> RunJob(FileJob job)
         {
             var path = job.FilePath;
 
@@ -100,17 +95,19 @@ namespace SpeckleSync
 
             var command = $"commands/{Path.GetFileNameWithoutExtension(path)}";
 
-            _logger.LogInformation($"Attempting push to '{_client.BaseAddress}{command}'");
+            var client = _httpClientFactory.CreateClient(nameof(SpeckleServer));
+
+            _logger.LogInformation($"Attempting push to '{client.BaseAddress}{command}'");
 
             var message = "";
 
             try
             {
 
-                var res = _client.PutAsJsonAsync(command, new
+                var res = await client.PutAsJsonAsync(command, new
                 {
                     ghString = Convert.ToBase64String(File.ReadAllBytes(path))
-                }).WaitAsync(TimeSpan.FromSeconds(10)).Result;
+                }).WaitAsync(TimeSpan.FromSeconds(10));
 
                 if (res.IsSuccessStatusCode)
                 {

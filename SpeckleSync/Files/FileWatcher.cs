@@ -73,7 +73,7 @@ namespace SpeckleSync.Files
         {
             using var scope = _serviceProvider.CreateScope();
             var consumerService = scope.ServiceProvider.GetRequiredService<Pusher>();
-            consumerService.RegisterJob(new FileJob(e.FullPath));
+            consumerService.RunJob(new FileJob(e.FullPath)).ContinueWith(x => _logger.Log(LogLevel.Information,$"Job fired with result: {x.IsCompletedSuccessfully}"));
         }
     }
 }

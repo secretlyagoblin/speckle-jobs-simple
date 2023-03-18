@@ -11,9 +11,13 @@ namespace SpeckleSync
             var host = Host.CreateDefaultBuilder(args)
                 .ConfigureServices((hostContext, services) =>
                 {
-                    services.AddHostedService<Worker>()
+                    services
+                        .AddHttpClient(nameof(SpeckleServer), x => { x.BaseAddress = new Uri(hostContext.Configuration.GetValue<string>("SpeckleHttpService") ?? ""); });
+
+                    services
+                        .AddHostedService<Worker>()                        
                         .AddSingleton<IFileWatcher, FileWatcher>()
-                        .AddSingleton<Pusher>();
+                        .AddTransient<Pusher>();
                 })
                 .Build();
 

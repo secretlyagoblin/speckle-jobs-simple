@@ -20,6 +20,7 @@ using Microsoft.Extensions.DependencyInjection;
 using SpeckleSync.Files;
 using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Hosting;
+using NUnit.Framework;
 
 namespace SpeckleSync.Tests
 {
@@ -73,6 +74,8 @@ namespace SpeckleSync.Tests
 
         private IHostBuilder ConfigureSpeckleSync(string settings = "appsettings.SpeckleTest.json")
         {
+            var configRoot = GetConfigurationRoot(settings);
+
             var builder = new HostBuilder()
             .ConfigureLogging(logging =>
             {
@@ -81,7 +84,11 @@ namespace SpeckleSync.Tests
                 logging.SetMinimumLevel(LogLevel.Debug);
             }).ConfigureServices((context, services) =>
             {
-                services.AddSingleton<IConfiguration>(GetConfigurationRoot(settings));
+                services.AddHttpClient(nameof(SpeckleServer), x => { x.BaseAddress = new Uri(configRoot.GetValue<string>("SpeckleHttpService") ?? ""); });
+
+
+
+                services.AddSingleton<IConfiguration>(configRoot);
                 services.AddHostedService<Worker>();
                 services.AddSingleton<IFileWatcher, FileWatcher>();
                 services.AddSingleton<Pusher>();
